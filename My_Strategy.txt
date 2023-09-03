@@ -1,0 +1,147 @@
+Hangman Game (by Chinmay Routray) - My strategy
+
+The idea was to train a RNN and obtain a model which can be later 
+employed to play the game.
+
+1- The first requirement is to prepare the training data from given words.
+The words in the given file have to be converted to obscure words with blanks 
+'_' and their corresponding target labels and a list of wrong guesses. 
+
+Target labels are list of all possible missing letters.
+
+Wrong guesses is a list of randomly chosen letters in the complementary
+set of the given word or the letters which are absent in the word.
+ 
+For example -     
+                 (word) ----> (obscure word, label)             (wrong guesses)
+
+			a n t ----> (a _ t , ['n'])               (['e', 'i', 'u', 'p'])
+
+		p o t a t o ----> (p _ _ a _ _ , ['o', 't'])         (['e', 'i'])
+
+2- How many '_' should be introduced ?
+	Longest word length = 29
+	Average word length = 9.4
+
+I start by introducing one '_' replacing one letter in the word dataset.
+For each 200 epoch, no. of missing letters or '_' in its place is 
+incremented by 1.
+      Total no. of epochs = 3000
+
+So that, by the end of training, we have training words with 15 missing 
+letters (more than average). 
+The training data is refreshed every 200 epochs and the difficulty level 
+of the game increases as num of epochs increases.
+
+If no. of '_' to be introduces > len(word), all letters are replaced
+by '_'. 
+Ex -   a n t (drop 5 letters - 5 '_') ------> _ _ _  
+
+3- How many words in wrong guess list ?
+ 
+I designed the prob() function to find len(wrong guesses). The beginning 
+of training has less missing letters or '_' and end of training has more.
+So, beginning of training is equivalent to end of hangman game and end phase
+of training simulates beginning of hangman game.
+
+In the beginning of game, wrong guess list is empty or has few letters.
+and in the end len(wrong guess) is more (close to allowed no. of attempts)
+
+prob() given number in [1,5], 
+len(wrong guess) = 1  in the beginning
+len(wrong guess) = 5  in the end
+max_misses = 5 as, if there are 6 misses the game ends
+
+
+5- Next step is to encode obscure words, targets and wrong guesses.
+
+We use a dictionary to map letters to indices.
+
+0-26 for a-z and 27 for '_'
+
+Obscure word - converted to a tensor of size (max_len x 27)
+		   with 1s at indices of the letter present in corresponding position
+              0s elsewhere
+
+max_len = length of longest word
+I used fixed padding, but word length is also kept so that, later it is 
+passed to pack_padded_sequence(enforce_sorting = False) which would reduce
+computations by packing the padded batch. 
+
+For eg. - w = 'a b d' - size(29 x 27)
+		w[0][0] = 1,  w[1][1] = 1, w[2][3] = 1, else w[x][y] = 0
+
+targets - tensor of size (1 x 26)
+          with 1s at indices present in label list, 0s elsewhere
+
+wrong guess - tensor of size (1 x 26)
+          with 1s at indices present in wrong guess list, 0s elsewhere
+
+
+6- Next, step is choosing the batch size. I think there is a trade off
+between batch size and no. of batches when training dataset size is fixed.
+In any case, I chose batch size = 4000
+
+7- The model is a bi-directional LSTM. The idea is to give the encoded
+word as input, then extract the hidden_state from the LSTM, concatenate
+it with the output of a linear layer whose input is encoded wrong guess.
+Then, pass this concatenated vector through a ReLU layer, then, again
+a linear layer to get the prediction. Compare it with target labels.
+Model parameters are chosen conventionaly.
+
+Loss function chosen is BCEwithLegits(reduction=sum) as each prediction 
+vector element is either 0 or 1. (binary classification)
+
+Optimizer is Adam() with learning rate = 0.0005
+I tried with lr = 0.005 ----> not good
+I think somewhere in (0.0009, 0.0005) would be best.
+I could not be sure as I have limited training trials.
+
+8- The model is trained with GPU P100 on kaggle. 
+The model is saved to a file after training completes.
+In the guess_word() function, this trained model is loaded and provided
+with encoded inputs to output a (1 x 26) tensor.
+The index with maximum value is mapped to its corresponding alphabet
+to return a letter.
+
+
+Limitations I faced - 
+
+1- I could only train the model for 1000 epochs with training data 
+refresing every 100 iterations and could introduce maximum of 10
+'_' or missing letters while training, which took me 5.5 hours due
+   to lack of computational infrastructure. Not to count other trial
+runs. 
+
+Recorded results are with a model trained upto 1000 epochs with a refreshed
+dataset after each 100 epoch, maximum 10 missing letters during training.
+
+I believe if I were able to train the model for 3000 - 5000 epochs,
+my results would be better.
+With better infrastructure, I believe the model could have been trained
+better. I could also get the chance to tune the hyper-parameters.
+
+
+What could have been done better -
+
+I think with more number of missing letters, there is a requirement 
+of more training epochs to bring down loss, i.e. the training data
+refresh rate should go down as the training progresses.
+For eg. at the start, training data refreshes every 200 epoch,
+        it should gradually refresh at 300 or 375(>200) epochs as training 
+continues.
+
+
+I m a skilled and efficient professional and have done justice to all the opportunities in my career. Now, I want to purse the field of ML, data science, etc. I have a strong understanding of the underlying mathematics, machine learning algorithms and programming concepts. I would really appreciate if I m given the opportunity. Thank you
+
+
+https://www.linkedin.com/feed/update/urn:li:activity:7097615396635049984?utm_source=share&utm_medium=member_desktop
+
+
+
+
+
+
+
+
+
