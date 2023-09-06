@@ -1,0 +1,7 @@
+torch
+fastapi
+typing
+uvicorn
+time
+pwinput
+requests
